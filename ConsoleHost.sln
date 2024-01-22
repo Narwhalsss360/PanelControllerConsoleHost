@@ -17,7 +17,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CLIApplication", "dependenc
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PanelController", "dependencies\PanelController\PanelController\PanelController.csproj", "{016565F2-FCD3-48E3-A40D-34C5053E8C22}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleExtensions", "ConsoleExtensions\ConsoleExtensions.csproj", "{4E3FD954-2729-4C16-A730-52B63244227C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConsoleExtensions", "ConsoleExtensions\ConsoleExtensions.csproj", "{4E3FD954-2729-4C16-A730-52B63244227C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NStreamCom", "dependencies\PanelController\dependencies\NStreamCom\src\C#\NStreamCom\NStreamCom.csproj", "{D2A91EBA-80A4-4EF0-9A94-74ED70107B06}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -41,6 +43,10 @@ Global
 		{4E3FD954-2729-4C16-A730-52B63244227C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4E3FD954-2729-4C16-A730-52B63244227C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4E3FD954-2729-4C16-A730-52B63244227C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D2A91EBA-80A4-4EF0-9A94-74ED70107B06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D2A91EBA-80A4-4EF0-9A94-74ED70107B06}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D2A91EBA-80A4-4EF0-9A94-74ED70107B06}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D2A91EBA-80A4-4EF0-9A94-74ED70107B06}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -48,6 +54,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{81A8E878-7F2C-47C1-BE0B-AF8DE078FAE7} = {79377AD8-4914-4AD5-82E3-EB90037E31A9}
 		{016565F2-FCD3-48E3-A40D-34C5053E8C22} = {79377AD8-4914-4AD5-82E3-EB90037E31A9}
+		{D2A91EBA-80A4-4EF0-9A94-74ED70107B06} = {79377AD8-4914-4AD5-82E3-EB90037E31A9}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {149FEB3F-B7C7-456C-BC17-BD16E6EB8BD4}
