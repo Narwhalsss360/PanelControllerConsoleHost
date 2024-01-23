@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.7.34031.279
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConsoleHost", "ConsoleHost\ConsoleHost.csproj", "{877F1502-BDC3-4CFF-987D-F095D4B2B4BE}"
+	ProjectSection(ProjectDependencies) = postProject
+		{4E3FD954-2729-4C16-A730-52B63244227C} = {4E3FD954-2729-4C16-A730-52B63244227C}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Repository", "Repository", "{15042A78-AD89-4892-B5BE-DFBB942786DC}"
 	ProjectSection(SolutionItems) = preProject
