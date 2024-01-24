@@ -6,6 +6,7 @@ using PanelController.Profiling;
 using System.Reflection;
 using System.IO;
 using CtrlMain = PanelController.Controller.Main;
+using System.Windows.Threading;
 using System.Windows;
 
 public static class Program
@@ -13,13 +14,17 @@ public static class Program
     public static CLIInterpreter interpreter = new(
         ShowLoadedExtensions,
         CreateProfile,
+        Dump,
         ShowProfiles,
         SelectProfile,
         CreateMapping,
         ShowMappings,
+        AddToMapping,
         DeleteMapping,
         DeleteProfile,
         CreateObject,
+        ShowConnectedPanels,
+        SetPanelName,
         Clear,
         Quit);
 
@@ -82,7 +87,13 @@ public static class Program
             Console.WriteLine($"{item.GetItemName()}({item.FullName}):{item.GetItemDescription()}");
     }
 
-    public static void CreateProfile(string name, string[] flags)
+    public static void Dump()
+    {
+        foreach (var item in Logger.Logs)
+            Console.WriteLine($"{item:[/L][/F] /M}");
+    }
+
+    public static void CreateProfile(string name, string[]? flags = null)
     {
         CtrlMain.Profiles.Add(new() { Name = name });
         if (flags.Contains("--s"))
@@ -128,7 +139,7 @@ public static class Program
         CtrlMain.Profiles.RemoveAt(CtrlMain.SelectedProfileIndex);
     }
 
-    public static void CreateMapping(string panelName, InterfaceTypes interfaceType, uint interfaceID, bool? activate = null)
+    public static void CreateMapping(string panelName, InterfaceTypes interfaceType, decimal interfaceID, bool? activate = null)
     {
         if (CtrlMain.CurrentProfile is null)
         {
@@ -142,7 +153,7 @@ public static class Program
             return;
         }
 
-        if (CtrlMain.CurrentProfile.FindMapping(panelInfo.PanelGuid, interfaceType, interfaceID, activate) is not null)
+        if (CtrlMain.CurrentProfile.FindMapping(panelInfo.PanelGuid, interfaceType, (uint)interfaceID, activate) is not null)
         {
             Console.WriteLine("Mapping already exists");
             return;
@@ -152,12 +163,12 @@ public static class Program
         {
             PanelGuid = panelInfo.PanelGuid,
             InterfaceType = interfaceType,
-            InterfaceID = interfaceID,
+            InterfaceID = (uint)interfaceID,
             InterfaceOption = activate
         });
     }
 
-    public static void DeleteMapping(string panelName, InterfaceTypes interfaceType, uint interfaceID, bool? activate = null)
+    public static void DeleteMapping(string panelName, InterfaceTypes interfaceType, decimal interfaceID, bool? activate = null)
     {
         if (CtrlMain.CurrentProfile is null)
         {
@@ -171,7 +182,7 @@ public static class Program
             return;
         }
 
-        if (CtrlMain.CurrentProfile.FindMapping(panelInfo.PanelGuid, interfaceType, interfaceID, activate) is Mapping mapping)
+        if (CtrlMain.CurrentProfile.FindMapping(panelInfo.PanelGuid, interfaceType, (uint)interfaceID, activate) is Mapping mapping)
         {
             CtrlMain.CurrentProfile.RemoveMapping(mapping);
             Console.WriteLine("Done.");
@@ -201,19 +212,83 @@ public static class Program
         }
     }
 
-    public static void CreateObject()
+    public static void AddToMapping(string panelName, InterfaceTypes interfaceType, decimal interfaceID, string typeFullName, bool? activate = null)
     {
-        if (Extensions.ExtensionsByCategory[Extensions.ExtensionCategories.Generic].Count == 0)
+        if (CtrlMain.CurrentProfile is null)
         {
-            Console.WriteLine("There are no generic object types loaded.");
+            Console.WriteLine("No selected profile!");
             return;
         }
 
-        Console.WriteLine("Select type:");
-        for (int i = 0; i < Extensions.ExtensionsByCategory[Extensions.ExtensionCategories.Generic].Count; i++)
+        if (CtrlMain.PanelsInfo.Find(panel => panel.Name == panelName) is not PanelInfo panelInfo)
         {
-            var type = Extensions.ExtensionsByCategory[Extensions.ExtensionCategories.Generic][i];
-            Console.WriteLine($"{i}   {type.FullName}({type.GetItemName()}) {type.GetItemDescription()}");
+            Console.WriteLine($"Couldn't find panel with name {panelName}");
+            return;
+        }
+
+        if (CtrlMain.CurrentProfile.FindMapping(panelInfo.PanelGuid, interfaceType, (uint)interfaceID, activate) is not Mapping mapping)
+        {
+            Console.WriteLine("Mapping doesnt exist!");
+            return;
+        }
+
+        if (Array.Find(Extensions.AllExtensions, t => t.FullName == typeFullName) is not Type type)
+        {
+            Console.WriteLine("Type not found!");
+            return;
+        }
+
+        mapping.Objects.Add(new(type.CreatePanelObject(), TimeSpan.Zero, null));
+    }
+
+    public static void CreateObject(string typeFullName)
+    {
+        Type[] NonGenericInterfaces = new Type[]
+        {
+            typeof(IChannel),
+            typeof(IPanelAction),
+            typeof(IPanelSettable),
+            typeof(IPanelSource)
+        };
+
+        if (Array.Find(Extensions.AllExtensions, t => t.FullName == typeFullName) is not Type type)
+        {
+            Console.WriteLine("Type not found!");
+            return;
+        }
+
+        if (NonGenericInterfaces.Contains(type))
+        {
+            Console.WriteLine("type must be generic!");
+            return;
+        }
+
+        Extensions.GenericObjects.Add(type.CreatePanelObject());
+        if (typeof(Window).IsAssignableFrom(type))
+            Dispatcher.Run();
+    }
+
+    public static void ShowConnectedPanels()
+    {
+        Console.WriteLine("Panel Giuid | Channel Name | Name");
+        foreach (var item in CtrlMain.ConnectedPanels)
+            Console.WriteLine($"{item.PanelGuid} | {item.Channel.GetItemName()} | {CtrlMain.PanelsInfo.Find(info => info.PanelGuid == item.PanelGuid)}");
+    }
+
+    public static void SetPanelName()
+    {
+        if (CtrlMain.ConnectedPanels.Count == 0)
+        {
+            Console.WriteLine("No panels are connected!");
+            return;
+        }
+
+        Console.WriteLine("Select a panel:");
+        Console.WriteLine("Select Index | Panel Giuid | Channel Name | Name");
+        for (int i = 0; i < CtrlMain.ConnectedPanels.Count; i++)
+        {
+            var item = CtrlMain.ConnectedPanels[i];
+            Console.WriteLine($"{i} | {item.PanelGuid} | {item.Channel.GetItemName()} | {CtrlMain.PanelsInfo.Find(info => info.PanelGuid == item.PanelGuid)}");
         }
 
         int index;
@@ -223,14 +298,19 @@ public static class Program
             return;
         }
 
-        if (index >= Extensions.ExtensionsByCategory[Extensions.ExtensionCategories.Generic].Count)
+        PanelInfo info;
+        if (CtrlMain.PanelsInfo.Find(info => info.PanelGuid == CtrlMain.ConnectedPanels[index].PanelGuid) is PanelInfo found)
         {
-            Console.WriteLine("Out of range!");
-            return;
+            info = found;
+        }
+        else
+        {
+            info = new PanelInfo() { PanelGuid = CtrlMain.ConnectedPanels[index].PanelGuid };
+            CtrlMain.PanelsInfo.Add(info);
         }
 
-
-        Task t = Task.Run(() => Activator.CreateInstance(Extensions.ExtensionsByCategory[Extensions.ExtensionCategories.Generic][index]));
+        Console.Write("New name:");
+        info.Name = Console.ReadLine() ?? "Panel";
     }
 
     public static void Clear()
@@ -240,6 +320,7 @@ public static class Program
 
     public static void Quit()
     {
+        Dispatcher.ExitAllFrames();
         CtrlMain.Deinitialize();
     }
 }
