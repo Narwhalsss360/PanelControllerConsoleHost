@@ -26,7 +26,10 @@ public static class Program
         ShowConnectedPanels,
         SetPanelName,
         Clear,
-        Quit);
+        Quit)
+    {
+        InterfaceName = "PanelController CLI"
+    };
 
     public static readonly string ExtensionsFolder = "Extensions";
 
@@ -64,10 +67,6 @@ public static class Program
             {
                 Console.WriteLine("There was an error loading extensions!");
                 Quit();
-            }
-            else
-            {
-                Console.WriteLine("Successfully loaded extensions.");
             }
         });
         interpreter.Run(CtrlMain.DeinitializedCancellationToken);
@@ -238,34 +237,99 @@ public static class Program
             return;
         }
 
-        mapping.Objects.Add(new(type.CreatePanelObject(), TimeSpan.Zero, null));
+        IPanelObject? panelObject = CreateInstance(type);
+
+        if (panelObject is null)
+            return;
+
+        mapping.Objects.Add(new(panelObject, TimeSpan.Zero, null));
+    }
+
+    private static IPanelObject? CreateInstance(Type type)
+    {
+        ConstructorInfo[] constructors = type.GetConstructors(BindingFlags.Instance | BindingFlags.Public);
+
+        int index = 0;
+
+
+        if (constructors.Length > 1)
+        {
+            Console.WriteLine("Select constructor:");
+            for (int i = 0; i < constructors.Length; i++)
+                Console.WriteLine($"{i} {constructors[i].Name}({constructors[i].GetParameters().GetParametersDescription()})");
+            if (!int.TryParse(Console.ReadLine(), out index))
+            {
+                Console.WriteLine("Not a number!");
+                return null;
+            }
+        }
+
+        if (0 > index || constructors.Length <= index)
+        {
+            Console.WriteLine("Invalid index!");
+            return null;
+        }
+
+        object?[] arguments = Array.Empty<object>();
+
+        ConstructorInfo constructor = constructors[index];
+        ParameterInfo[] parameters = constructor.GetParameters();
+
+        if (parameters.Length != 0)
+        {
+            Console.Write("Enter Arguemnts:");
+            if (Console.ReadLine() is not string entry)
+                return null;
+
+            string[] entries = entry.DeliminateOutside().ToArray();
+
+
+            if (entries.Length < parameters.RequiredArguments())
+            {
+                Console.WriteLine("Not enough arguments.");
+                return null;
+            }
+
+            arguments = parameters.ParseArguments(entries);
+        }
+
+        IPanelObject? panelObject;
+        try
+        {
+            panelObject = Activator.CreateInstance(type, arguments) as IPanelObject;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"An exception was thrown creating the instance: {e.Message}.");
+            return null;
+        }
+
+        if (panelObject is null)
+        {
+            Console.WriteLine("Object was not of IPanelObject.");
+            return null;
+        }
+
+        return panelObject;
     }
 
     public static void CreateObject(string typeFullName)
     {
-        Type[] NonGenericInterfaces = new Type[]
-        {
-            typeof(IChannel),
-            typeof(IPanelAction),
-            typeof(IPanelSettable),
-            typeof(IPanelSource)
-        };
-
         if (Array.Find(Extensions.AllExtensions, t => t.FullName == typeFullName) is not Type type)
         {
             Console.WriteLine("Type not found!");
             return;
         }
 
-        if (NonGenericInterfaces.Contains(type))
-        {
-            Console.WriteLine("type must be generic!");
-            return;
-        }
+        IPanelObject? panelObject = CreateInstance(type);
 
-        Extensions.GenericObjects.Add(type.CreatePanelObject());
-        if (typeof(Window).IsAssignableFrom(type))
+        if (panelObject is null)
+            return;
+
+        if (type.IsAssignableTo(typeof(Window)))
             Dispatcher.Run();
+
+        Extensions.Objects.Add(panelObject);
     }
 
     public static void ShowConnectedPanels()
@@ -322,5 +386,6 @@ public static class Program
     {
         Dispatcher.ExitAllFrames();
         CtrlMain.Deinitialize();
+        Console.WriteLine("Exiting...");
     }
 }

@@ -22,6 +22,17 @@ namespace ConsoleExtensions
 
         public Logger.Levels Level { get; set; } = Logger.Levels.Info;
 
+        public LogMessage()
+        {
+        }
+
+        public LogMessage(string message, string sender, Logger.Levels level)
+        {
+            Message = message;
+            Sender = sender;
+            Level = level;
+        }
+
         public object? Run()
         {
             string log = Message;
