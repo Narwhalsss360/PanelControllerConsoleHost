@@ -1,5 +1,6 @@
 ﻿using PanelController.Controller;
 using PanelController.PanelObjects;
+using PanelController.PanelObjects.Properties;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -18,19 +19,40 @@ namespace ConsoleExtensions
             VerticalScrollBarVisibility = ScrollBarVisibility.Visible,
         };
 
+        private string _logFormat = "/T [/L][/F] /M";
+
+        [UserProperty]
+        public string LogFormat
+        {
+            get
+            {
+                return _logFormat;
+            }
+            set
+            {
+                _logFormat = value;
+                if (!_logFormat.EndsWith("\n"))
+                    _logFormat = "\n";
+            }
+        }
+
+
         public LogWindow()
         {
             Main.Deinitialized += (sender, e) => { Close(); };
             Logger.Logged += Logger_Logged;
             Closed += LogWindow_Closed;
-
-            foreach (var item in Logger.Logs)
-                LogBox.Text += item.ToString("/T [/L][/F] /M\n");
             AddChild(LogBox);
-
+            RefreshLogs();
             LogBox.TextChanged += LogBox_TextChanged;
-
             Show();
+        }
+
+        private void RefreshLogs()
+        {
+            LogBox.Text = "";
+            foreach (var log in Logger.Logs)
+                LogBox.Text += log.ToString(_logFormat);
         }
 
         private void LogBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -39,7 +61,7 @@ namespace ConsoleExtensions
             LogBox.ScrollToEnd();
         }
 
-        private void Logger_Logged(object? sender, Logger.HistoricalLog e) => LogBox.Dispatcher.Invoke(() => { LogBox.Text += e.ToString("/T [/L][/F] /M\n"); });
+        private void Logger_Logged(object? sender, Logger.HistoricalLog e) => LogBox.Dispatcher.Invoke(() => { LogBox.Text += e.ToString(_logFormat); });
 
         private void LogWindow_Closed(object? sender, EventArgs e)
         {
