@@ -1,6 +1,7 @@
 ﻿using PanelController.Controller;
 using PanelController.PanelObjects;
 using PanelController.PanelObjects.Properties;
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -33,6 +34,7 @@ namespace ConsoleExtensions
                 _logFormat = value;
                 if (!_logFormat.EndsWith("\n"))
                     _logFormat = "\n";
+                Dispatcher.Invoke(RefreshLogs);
             }
         }
 
@@ -45,7 +47,19 @@ namespace ConsoleExtensions
             AddChild(LogBox);
             RefreshLogs();
             LogBox.TextChanged += LogBox_TextChanged;
+            Extensions.Objects.CollectionChanged += Objects_CollectionChanged;
             Show();
+        }
+
+        private void Objects_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs args)
+        {
+            if (args.Action == NotifyCollectionChangedAction.Remove)
+            {
+                if (args.OldItems is null)
+                    return;
+                if (args.OldItems.Contains(this))
+                    Close();
+            }
         }
 
         private void RefreshLogs()
