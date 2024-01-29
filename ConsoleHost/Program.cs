@@ -156,24 +156,33 @@ namespace ConsoleHost
         [STAThread]
         private static void Main()
         {
-            LoadAll();
             SaveTimer.Elapsed += SaveAll;
-
+            CtrlMain.Initialized += Initialized;
+            CtrlMain.Deinitialized += Deinitalized;
             CtrlMain.Initialize();
+        }
+
+        public static void Initialized(object? sender, EventArgs args)
+        {
+            LoadAll();
             SaveTimer.Start();
             InterpreterThread.Start();
             Dispatcher.Run();
         }
 
-        public static void Quit()
+        public static void Deinitalized(object? sender, EventArgs args)
         {
-            Console.WriteLine("Exiting...");
             MainDispatcher.Invoke(() => { MainDispatcher.DisableProcessing(); });
             Dispatcher.ExitAllFrames();
             SaveTimer.Stop();
-            CtrlMain.Deinitialize();
             CLI.Interpreter.Stop();
             Environment.Exit(0);
+        }
+
+        public static void Quit()
+        {
+            Console.WriteLine("Exiting...");
+            CtrlMain.Deinitialize();
         }
     }
 }
