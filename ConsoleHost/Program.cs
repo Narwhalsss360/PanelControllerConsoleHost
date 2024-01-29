@@ -1,17 +1,17 @@
 ﻿using PanelController.Controller;
 using PanelController.Profiling;
-using System.Reflection;
 using System.IO;
-using CtrlMain = PanelController.Controller.Main;
+using System.Reflection;
 using System.Windows.Threading;
-using System.Xml.Serialization;
 using System.Xml;
+using System.Xml.Serialization;
+using CtrlMain = PanelController.Controller.Main;
 
 namespace ConsoleHost
 {
     public static class Program
     {
-        public static Thread InterpreterThread = new Thread(() => { CLI.Interpreter.Run(CtrlMain.DeinitializedCancellationToken); });
+        public static Thread InterpreterThread = new(() => { CLI.Interpreter.Run(CtrlMain.DeinitializedCancellationToken); });
 
         public static System.Timers.Timer SaveTimer = new() { AutoReset = true, Interval = 10000 };
 
@@ -55,41 +55,54 @@ namespace ConsoleHost
 
         public static void LoadProfiles()
         {
-            if (Directory.Exists(ProfilesDirectory))
+            if (!Directory.Exists(ProfilesDirectory))
+                return;
+
+            XmlSerializer serializer = new(typeof(Profile.SerializableProfile));
+            foreach (FileInfo file in new DirectoryInfo(ProfilesDirectory).GetFiles())
             {
-                XmlSerializer serializer = new(typeof(Profile.SerializableProfile));
-                foreach (var file in new DirectoryInfo(ProfilesDirectory).GetFiles())
-                {
-                    if (file.Extension != ".xml")
-                        continue;
-                    using FileStream stream = file.OpenRead();
-                    XmlReader reader = XmlReader.Create(stream);
-                    if (!serializer.CanDeserialize(reader))
-                        continue;
+                if (file.Extension.ToLower() != ".xml")
+                    continue;
 
-                    if (serializer.Deserialize(reader) is not Profile.SerializableProfile profile)
-                        continue;
-                    CtrlMain.Profiles.Add(new(profile));
-                }
+                using FileStream stream = file.OpenRead();
+                using XmlReader reader = XmlReader.Create(stream);
+                if (!serializer.CanDeserialize(reader))
+                    continue;
+                if (serializer.Deserialize(reader) is not Profile.SerializableProfile serializable)
+                    continue;
+
+                CtrlMain.Profiles.Add(new(serializable));
             }
+        }
 
-            if (Directory.Exists(PanelsInfoDirectory))
+        public static void LoadPanels()
+        {
+            if (!Directory.Exists(PanelsInfoDirectory))
+                return;
+
+            XmlSerializer serializer = new(typeof(PanelInfo));
+            foreach (FileInfo file in new DirectoryInfo(PanelsInfoDirectory).GetFiles())
             {
-                XmlSerializer serializer = new(typeof(PanelInfo));
-                foreach (var file in new DirectoryInfo(PanelsInfoDirectory).GetFiles())
-                {
-                    if (file.Extension != ".xml")
-                        continue;
-                    using FileStream stream = file.OpenRead();
-                    XmlReader reader = XmlReader.Create(stream);
-                    if (!serializer.CanDeserialize(reader))
-                        continue;
+                if (file.Extension.ToLower() != ".xml")
+                    continue;
 
-                    if (serializer.Deserialize(reader) is not PanelInfo panelInfo)
-                        continue;
-                    CtrlMain.PanelsInfo.Add(panelInfo);
-                }
+                using FileStream stream = file.OpenRead();
+                using XmlReader reader = XmlReader.Create(stream);
+
+                if (!serializer.CanDeserialize(reader))
+                    continue;
+                if (serializer.Deserialize(reader) is not PanelInfo panelInfo)
+                    continue;
+
+                CtrlMain.PanelsInfo.Add(panelInfo);
             }
+        }
+
+        public static void LoadAll()
+        {
+            LoadExtensions();
+            LoadPanels();
+            LoadProfiles();
         }
 
         public static void SaveProfiles()
@@ -98,74 +111,53 @@ namespace ConsoleHost
                 Directory.CreateDirectory(ProfilesDirectory);
 
             XmlSerializer serializer = new(typeof(Profile.SerializableProfile));
-            foreach (var profile in CtrlMain.Profiles)
+            foreach (Profile profile in CtrlMain.Profiles)
             {
-                string profilePath = Path.Combine(ProfilesDirectory, $"{profile.Name}.xml");
-                try
-                {
-                    using FileStream file = File.Open(profilePath, FileMode.OpenOrCreate, FileAccess.Write);
-                    serializer.Serialize(file, new Profile.SerializableProfile(profile));
-                }
-                catch (IOException)
-                {
-                    continue;
-                }
+                using FileStream file = File.Open($"{profile.Name}.xml", FileMode.Create);
+                using XmlWriter writer = XmlWriter.Create(file);
+                serializer.Serialize(writer, new Profile.SerializableProfile(profile));
             }
 
-            foreach (var file in new DirectoryInfo(ProfilesDirectory).GetFiles())
+            foreach (FileInfo file in new DirectoryInfo(ProfilesDirectory).GetFiles())
             {
                 if (CtrlMain.Profiles.Any(profile => $"{profile.Name}.xml" == file.Name))
                     continue;
-                try
-                {
-                    file.Delete();
-                }
-                catch (IOException)
-                {
-                    continue;
-                }
-            }
-
-            if (!Directory.Exists(PanelsInfoDirectory))
-                Directory.CreateDirectory(PanelsInfoDirectory);
-
-            serializer = new(typeof(PanelInfo));
-            foreach (var info in CtrlMain.PanelsInfo)
-            {
-                string panelInfoPath = Path.Combine(PanelsInfoDirectory, $"{info.PanelGuid}.xml");
-                try
-                {
-                    using FileStream stream = File.Open(panelInfoPath, FileMode.Create, FileAccess.Write);
-                    serializer.Serialize(stream, info);
-                }
-                catch (IOException)
-                {
-                    continue;
-                }
-            }
-
-            foreach (var file in new DirectoryInfo(PanelsInfoDirectory).GetFiles())
-            {
-                if (CtrlMain.PanelsInfo.Any(info => $"{info.PanelGuid}.xml" == file.Name))
-                    continue;
-                try
-                {
-                    file.Delete();
-                }
-                catch (IOException)
-                {
-                    continue;
-                }
+                file.Delete();
             }
         }
 
-        [STAThread]
-        private static void Main(string[] args)
+        public static void SavePanels()
         {
-            LoadExtensions();
-            LoadProfiles();
-            SaveTimer.Elapsed += (sender, args) => { SaveProfiles(); };
-            InterpreterThread.SetApartmentState(ApartmentState.STA);
+            if (!Directory.Exists(PanelsInfoDirectory))
+                Directory.CreateDirectory(PanelsInfoDirectory);
+
+            XmlSerializer serializer = new(typeof(PanelInfo));
+            foreach (PanelInfo panelInfo in CtrlMain.PanelsInfo)
+            {
+                using FileStream file = File.Open($"{panelInfo.PanelGuid}.xml", FileMode.Create);
+                using XmlWriter writer = XmlWriter.Create(file);
+                serializer.Serialize(writer, panelInfo);
+            }
+
+            foreach (FileInfo file in new DirectoryInfo(ProfilesDirectory).GetFiles())
+            {
+                if (CtrlMain.PanelsInfo.Any(panelInfo => $"{panelInfo.PanelGuid}.xml" == file.Name))
+                    continue;
+                file.Delete();
+            }
+        }
+
+        public static void SaveAll(object? sender = null, EventArgs? args = null)
+        {
+            SaveProfiles();
+            SavePanels();
+        }
+
+        [STAThread]
+        private static void Main()
+        {
+            LoadAll();
+            SaveTimer.Elapsed += SaveAll;
 
             CtrlMain.Initialize();
             SaveTimer.Start();

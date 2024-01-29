@@ -5,8 +5,7 @@ using PanelController.PanelObjects.Properties;
 using PanelController.Profiling;
 using System.Collections;
 using System.Reflection;
-using Windows.Media.Playback;
-
+i
 namespace ConsoleHost
 {
     public static class CLI
@@ -42,7 +41,7 @@ namespace ConsoleHost
                 }
             }
 
-            if (0 >  selectedIndex && constructors.Length <= selectedIndex)
+            if (0 > selectedIndex && constructors.Length <= selectedIndex)
             {
                 Console.WriteLine("Index was out of bounds");
                 return null;
@@ -56,7 +55,7 @@ namespace ConsoleHost
 
             }
 
-            IPanelObject? @object = null;
+            IPanelObject? @object;
             try
             {
                 @object = Activator.CreateInstance(type, arguments) as IPanelObject;
@@ -78,13 +77,6 @@ namespace ConsoleHost
         #endregion
 
         #region Select
-        public enum SelectOptions
-        {
-            Profile,
-            Panel,
-            Generic
-        }
-
         public static object? ContainingObject = null;
         public static IList? ContainingList = null;
         public static object? SelectedObject = null;
@@ -144,7 +136,7 @@ namespace ConsoleHost
             }
             else
             {
-                if (panelName.FindPanelInfo() is PanelInfo panelInfo)
+                if (Main.PanelsInfo.Find(info => info.Name == panelName) is PanelInfo panelInfo)
                 {
                     ContainingObject = null;
                     ContainingList = Main.PanelsInfo;
@@ -179,6 +171,13 @@ namespace ConsoleHost
             SelectedObject = Extensions.Objects[index];
         }
 
+        public enum SelectOptions
+        {
+            Profile,
+            Panel,
+            Generic
+        }
+
         public static void Select(SelectOptions? option = null, string? name = null)
         {
             if (option is null)
@@ -187,6 +186,7 @@ namespace ConsoleHost
                 Console.WriteLine($"    Containing object:{ContainingObject}");
                 Console.WriteLine($"    Containing collection:{ContainingList}");
                 Console.WriteLine($"    Selected object:{SelectedObject}");
+                Console.WriteLine($"Current Profile: {Main.CurrentProfile?.Name}");
                 return;
             }
             switch (option)
@@ -242,7 +242,7 @@ namespace ConsoleHost
             Console.WriteLine("Mappings: ");
             foreach (Mapping mapping in Main.CurrentProfile.Mappings)
             {
-                Console.WriteLine($"    {mapping.PanelGuid.PanelInfoOrGuid()} {mapping.InterfaceType} ID:{mapping.InterfaceID} OPTION:{mapping.InterfaceOption}");
+                Console.WriteLine($"    {mapping.PanelGuid.PanelInfoNameOrGuid()} {mapping.InterfaceType} ID:{mapping.InterfaceID} OPTION:{mapping.InterfaceOption}");
                 foreach (Mapping.MappedObject mapped in mapping.Objects)
                     Console.WriteLine($"        {mapped.Object}:{mapped.Object.Status} {mapped.Delay} {mapped.Value}");
             }
@@ -284,7 +284,8 @@ namespace ConsoleHost
             Profiles,
             Mappings,
             Panels,
-            Properties
+            Properties,
+            Selected
         }
 
         public static void Show(ShowOptions option = ShowOptions.All)
@@ -311,6 +312,9 @@ namespace ConsoleHost
                     break;
                 case ShowOptions.Properties:
                     ShowProperties();
+                    break;
+                case ShowOptions.Selected:
+                    Select(null);
                     break;
                 default:
                     break;
@@ -348,7 +352,7 @@ namespace ConsoleHost
                 return;
             }
 
-            if (panelName.FindPanelInfo() is not PanelInfo info)
+            if (Main.PanelsInfo.Find(info => info.Name == panelName) is not PanelInfo info)
             {
                 Console.WriteLine($"Did not find panel with name {panelName}");
                 return;
@@ -395,23 +399,44 @@ namespace ConsoleHost
                 return;
             }
 
-            if (panelName.FindPanelInfo() is not PanelInfo info)
+            PanelInfo info;
+            if (Main.PanelsInfo.Find(info => info.Name == panelName) is PanelInfo fromName)
             {
-                Console.WriteLine("Panel not found");
-                return;
+                info = fromName;
+            }
+            else
+            {
+                if (Main.PanelsInfo.Count == 0)
+                {
+                    Console.WriteLine("No panels info, please create one or connect a panel");
+                    return;
+                }
+
+                Console.WriteLine("Select Index:");
+                for (int i = 0; i < Main.PanelsInfo.Count; i++)
+                    Console.WriteLine($"    {i} {Main.PanelsInfo[i].Name} {Main.PanelsInfo[i].PanelGuid}");
+
+                if (!int.TryParse(Console.ReadLine(), out int index))
+                {
+                    Console.WriteLine("Not a number");
+                    return;
+                }
+
+                info = Main.PanelsInfo[index];
             }
 
-            Console.WriteLine("Enter interfaceType, interfaceID, objectName, onActivate(Digital Only)");
+            Console.WriteLine("Enter panelName/Guid, interfaceType, interfaceID, objectName, onActivate(Digital Only)");
             if (Console.ReadLine() is not string entry)
                 return;
 
             object?[] arguments = new Type[]
             {
+                typeof(string),
                 typeof(InterfaceTypes),
                 typeof(uint),
                 typeof(string),
                 typeof(bool?)
-            }.ParseArguments(entry.DeliminateOutside().ToArray(), new() { { 2, null } });
+            }.ParseArguments(entry.DeliminateOutside().ToArray(), new() { { 4, null } });
 
             bool? onActivate = arguments[3] as bool?;
             if (arguments[0] is not InterfaceTypes interfaceType ||
@@ -442,7 +467,7 @@ namespace ConsoleHost
 
         public static void CreatePanelInfo(string panelName)
         {
-            if (panelName.FindPanelInfo() is not null)
+            if (Main.PanelsInfo.Find(info => info.Name == panelName) is not null)
             {
                 Console.WriteLine("Panel with name already exsits");
                 return;
@@ -520,7 +545,7 @@ namespace ConsoleHost
                 Console.WriteLine($"{nameof(EditPanelInfo)} syntax: property=valueEntry");
                 return;
             }
-            string property = valueEntry.Substring(0, valueEntry.IndexOf('='));
+            string property = valueEntry[..valueEntry.IndexOf('=')];
             valueEntry = valueEntry[(valueEntry.IndexOf('=') + 1)..];
 
             if (!uint.TryParse(valueEntry, out uint value))
@@ -552,7 +577,7 @@ namespace ConsoleHost
                 Console.WriteLine($"{nameof(EditProperty)} syntax: property=valueEntry");
                 return;
             }
-            string property = valueEntry.Substring(0, valueEntry.IndexOf('='));
+            string property = valueEntry[..valueEntry.IndexOf('=')];
             valueEntry = valueEntry[(valueEntry.IndexOf('=') + 1)..];
 
             if (Array.Find(@object.GetUserProperties(), prop => prop.Name == property) is not PropertyInfo propertyInfo)
