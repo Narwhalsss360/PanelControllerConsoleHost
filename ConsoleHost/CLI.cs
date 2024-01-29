@@ -1,14 +1,17 @@
 ﻿using CLIApplication;
 using PanelController.Controller;
 using PanelController.PanelObjects;
+using PanelController.PanelObjects.Properties;
 using PanelController.Profiling;
+using System.Collections;
 using System.Reflection;
+using Windows.Media.Playback;
 
 namespace ConsoleHost
 {
     public static class CLI
     {
-        public static CLIInterpreter Interpreter = new(Show, Create, Select, Edit, Remove, LogDump, Clear, Quit)
+        public static CLIInterpreter Interpreter = new(Show, Create, Select, Deselect, Edit, Remove, LogDump, Clear, Quit)
         {
             InterfaceName = "PanelController",
             EntryMarker = ">"
@@ -74,6 +77,142 @@ namespace ConsoleHost
         }
         #endregion
 
+        #region Select
+        public enum SelectOptions
+        {
+            Profile,
+            Panel,
+            Generic
+        }
+
+        public static object? ContainingObject = null;
+        public static IList? ContainingList = null;
+        public static object? SelectedObject = null;
+
+        public static void SelectProfile(string? name = null)
+        {
+            if (name is null)
+            {
+                Console.WriteLine("Select index:");
+                for (int i = 0; i < Main.Profiles.Count; i++)
+                    Console.WriteLine($"{i} {Main.Profiles[i].Name}");
+
+                if (!int.TryParse(Console.ReadLine(), out int index))
+                {
+                    Console.WriteLine("Not a number");
+                    return;
+                }
+                Main.SelectedProfileIndex = index;
+                ContainingObject = null;
+                ContainingList = Main.Profiles;
+                SelectedObject = Main.CurrentProfile;
+            }
+            else
+            {
+                for (int i = 0; i < Main.Profiles.Count; i++)
+                {
+                    if (Main.Profiles[i].Name == name)
+                    {
+                        Main.SelectedProfileIndex = i;
+                        ContainingObject = null;
+                        ContainingList = Main.Profiles;
+                        SelectedObject = Main.CurrentProfile;
+                        return;
+                    }
+                }
+                Console.WriteLine($"Profile {name} not found");
+                SelectProfile(null);
+            }
+        }
+
+        public static void SelectPanel(string? panelName = null)
+        {
+            if (panelName is null)
+            {
+                Console.WriteLine("Select index:");
+                for (int i = 0; i < Main.PanelsInfo.Count; i++)
+                    Console.WriteLine($"{i} {Main.PanelsInfo[i].Name} | {Main.PanelsInfo[i].PanelGuid}");
+
+                if (!int.TryParse(Console.ReadLine(), out int index))
+                {
+                    Console.WriteLine("Not a number");
+                    return;
+                }
+                ContainingObject = null;
+                ContainingList = Main.PanelsInfo;
+                SelectedObject = Main.PanelsInfo[index];
+            }
+            else
+            {
+                if (panelName.FindPanelInfo() is PanelInfo panelInfo)
+                {
+                    ContainingObject = null;
+                    ContainingList = Main.PanelsInfo;
+                    SelectedObject = panelInfo;
+                    return;
+                }
+                Console.WriteLine($"Panel with name {panelName} was not found");
+                SelectPanel(null);
+            }
+        }
+
+        public static void SelectGeneric()
+        {
+            if (Extensions.Objects.Count == 0)
+            {
+                Console.WriteLine("No objects");
+                return;
+            }
+
+            Console.WriteLine("Select Index:");
+            for (int i = 0; i < Extensions.Objects.Count; i++)
+                Console.WriteLine($"{i} {Extensions.Objects[i].GetItemName()}");
+
+            if (!int.TryParse(Console.ReadLine(), out int index))
+            {
+                Console.WriteLine("Not a number");
+                return;
+            }
+
+            ContainingObject = null;
+            ContainingList = Extensions.Objects;
+            SelectedObject = Extensions.Objects[index];
+        }
+
+        public static void Select(SelectOptions? option = null, string? name = null)
+        {
+            if (option is null)
+            {
+                Console.WriteLine("Currently selected:");
+                Console.WriteLine($"    Containing object:{ContainingObject}");
+                Console.WriteLine($"    Containing collection:{ContainingList}");
+                Console.WriteLine($"    Selected object:{SelectedObject}");
+                return;
+            }
+            switch (option)
+            {
+                case SelectOptions.Profile:
+                    SelectProfile(name);
+                    break;
+                case SelectOptions.Panel:
+                    SelectPanel(name);
+                    break;
+                case SelectOptions.Generic:
+                    SelectGeneric();
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        public static void Deselect()
+        {
+            ContainingObject = null;
+            ContainingList = null;
+            SelectedObject = null;
+        }
+        #endregion
+
         #region Show
         public static void ShowLoadedExtensions()
         {
@@ -105,7 +244,7 @@ namespace ConsoleHost
             {
                 Console.WriteLine($"    {mapping.PanelGuid.PanelInfoOrGuid()} {mapping.InterfaceType} ID:{mapping.InterfaceID} OPTION:{mapping.InterfaceOption}");
                 foreach (Mapping.MappedObject mapped in mapping.Objects)
-                    Console.WriteLine($"        {mapped.Object} {mapped.Delay} {mapped.Value}");
+                    Console.WriteLine($"        {mapped.Object}:{mapped.Object.Status} {mapped.Delay} {mapped.Value}");
             }
         }
 
@@ -121,13 +260,31 @@ namespace ConsoleHost
             }
         }
 
+        public static void ShowProperties()
+        {
+            if (SelectedObject is not IPanelObject @object)
+            {
+                Console.WriteLine("Property listing is only supported on types of IPanelObject");
+                return;
+            }
+
+            PropertyInfo[] properties = @object.GetUserProperties();
+            if (properties.Length == 0)
+                return;
+
+            Console.WriteLine($"{@object.GetItemName()}:");
+            foreach (PropertyInfo property in properties)
+                Console.WriteLine($"    {property.PropertyType.Name} {property.Name} = {property.GetValue(@object)}");
+        }
+
         public enum ShowOptions
         {
             All,
             LoadedExtensions,
             Profiles,
             Mappings,
-            Panels
+            Panels,
+            Properties
         }
 
         public static void Show(ShowOptions option = ShowOptions.All)
@@ -151,6 +308,9 @@ namespace ConsoleHost
                     break;
                 case ShowOptions.Panels:
                     ShowPanels();
+                    break;
+                case ShowOptions.Properties:
+                    ShowProperties();
                     break;
                 default:
                     break;
@@ -325,97 +485,109 @@ namespace ConsoleHost
         }
         #endregion
 
-        #region Select
-        public enum SelectOptions
+        #region Edit
+        public enum EditOptions
         {
-            Profile,
-            Panel
+            Name,
+            PanelInfo,
+            Property
         }
 
-        public static object? ContainingObject = null;
-        public static ICollection<object>? ContainingCollection = null;
-        public static object? SelectedObject = null;
-
-        public static void SelectProfile(string? name = null)
+        public static void EditName(string name)
         {
-            if (name is null)
-            {
-                Console.WriteLine("Select index:");
-                for (int i = 0; i < Main.Profiles.Count; i++)
-                    Console.WriteLine($"{i} {Main.Profiles[i].Name}");
-
-                if (!int.TryParse(Console.ReadLine(), out int index))
-                {
-                    Console.WriteLine("Not a number");
-                    return;
-                }
-                Main.SelectedProfileIndex = index;
-                ContainingObject = null;
-                SelectedObject = Main.CurrentProfile;
-            }
+            if (SelectedObject is Profile profile)
+                profile.Name = name;
+            else if (SelectedObject is PanelInfo panelInfo)
+                panelInfo.Name = name;
+            else if (SelectedObject is Mapping mapping)
+                mapping.Name = name;
+            else if (SelectedObject is IPanelObject panelObject)
+                panelObject.TrySetItemName(name);
             else
-            {
-                for (int i = 0; i < Main.Profiles.Count; i++)
-                {
-                    if (Main.Profiles[i].Name == name)
-                    {
-                        Main.SelectedProfileIndex = i;
-                        ContainingObject = null;
-                        SelectedObject = Main.CurrentProfile;
-                        return;
-                    }
-                }
-                Console.WriteLine($"Profile {name} not found");
-                SelectProfile(null);
-            }
+                Console.WriteLine("Cannot edit name of selected object");
         }
 
-        public static void SelectPanel(string? panelName = null)
+        public static void EditPanelInfo(string valueEntry)
         {
-            if (panelName is null)
+            if (SelectedObject is not PanelInfo info)
             {
-                Console.WriteLine("Select index:");
-                for (int i = 0; i < Main.PanelsInfo.Count; i++)
-                    Console.WriteLine($"{i} {Main.PanelsInfo[i].Name} | {Main.PanelsInfo[i].PanelGuid}");
-
-                if (!int.TryParse(Console.ReadLine(), out int index))
-                {
-                    Console.WriteLine("Not a number");
-                    return;
-                }
-                ContainingObject = null;
-                SelectedObject = Main.PanelsInfo[index];
-            }
-            else
-            {
-                if (panelName.FindPanelInfo() is PanelInfo panelInfo)
-                {
-                    ContainingObject = null;
-                    SelectedObject = panelInfo;
-                    return;
-                }
-                Console.WriteLine($"Panel with name {panelName} was not found");
-                SelectPanel(null);
-            }
-        }
-
-        public static void Select(SelectOptions? option = null, string? name = null)
-        {
-            if (option is null)
-            {
-                Console.WriteLine("Currently selected:");
-                Console.WriteLine($"    Containing object:{ContainingObject}");
-                Console.WriteLine($"    Containing collection:{ContainingCollection}");
-                Console.WriteLine($"    Selected object:{SelectedObject}");
+                Console.WriteLine("Selected object is not PanelInfo");
                 return;
             }
+
+            if (!valueEntry.Contains('='))
+            {
+                Console.WriteLine($"{nameof(EditPanelInfo)} syntax: property=valueEntry");
+                return;
+            }
+            string property = valueEntry.Substring(0, valueEntry.IndexOf('='));
+            valueEntry = valueEntry[(valueEntry.IndexOf('=') + 1)..];
+
+            if (!uint.TryParse(valueEntry, out uint value))
+            {
+                Console.WriteLine("Not a number");
+                return;
+            }
+
+            if (property == "DigitalCount")
+                info.DigitalCount = value;
+            else if (property == "AnalogCount")
+                info.AnalogCount = value;
+            else if (property == "DisplayCount")
+                info.DisplayCount = value;
+            else
+                Console.WriteLine($"Property {property} not found");
+        }
+
+        public static void EditProperty(string valueEntry)
+        {
+            if (SelectedObject is not IPanelObject @object)
+            {
+                Console.WriteLine("Selected object is not IPanelObject");
+                return;
+            }
+
+            if (!valueEntry.Contains('='))
+            {
+                Console.WriteLine($"{nameof(EditProperty)} syntax: property=valueEntry");
+                return;
+            }
+            string property = valueEntry.Substring(0, valueEntry.IndexOf('='));
+            valueEntry = valueEntry[(valueEntry.IndexOf('=') + 1)..];
+
+            if (Array.Find(@object.GetUserProperties(), prop => prop.Name == property) is not PropertyInfo propertyInfo)
+            {
+                Console.WriteLine($"Property {property} not found");
+                return;
+            }
+
+            if (!ParameterInfoExtensions.IsSupported(propertyInfo.PropertyType))
+            {
+                Console.WriteLine($"Invalid Extension, type {propertyInfo.PropertyType} is not supported");
+                return;
+            }
+
+            if (valueEntry.ParseAs(propertyInfo.PropertyType) is not object @value)
+            {
+                Console.WriteLine($"There was an error parsing {valueEntry}");
+                return;
+            }
+
+            propertyInfo.SetValue(@object, @value);
+        }
+
+        public static void Edit(EditOptions option, string value)
+        {
             switch (option)
             {
-                case SelectOptions.Profile:
-                    SelectProfile(name);
+                case EditOptions.Name:
+                    EditName(value);
                     break;
-                case SelectOptions.Panel:
-                    SelectPanel(name);
+                case EditOptions.PanelInfo:
+                    EditPanelInfo(value);
+                    break;
+                case EditOptions.Property:
+                    EditProperty(value);
                     break;
                 default:
                     break;
@@ -423,45 +595,22 @@ namespace ConsoleHost
         }
         #endregion
 
-        #region Edit
-        public enum EditOptions
-        {
-            Name
-        }
-
-        public static void EditName(string newName)
-        {
-            if (SelectedObject is Profile profile)
-            {
-            }
-            else if (SelectedObject is PanelInfo panelInfo)
-            {
-                panelInfo.Name = newName;
-            }
-            else if (SelectedObject is Mapping mapping)
-            {
-            }
-            else
-            {
-                Console.WriteLine("Cannot edit name of selected object");
-            }
-        }
-
-        public static void Edit(EditOptions option, string name)
-        {
-            EditName(name);
-        }
-        #endregion
-
         #region Remove
-        public enum RemoveOptions
+        public static void Remove()
         {
+            Console.WriteLine("Are you sure? y/n");
+            if (Console.ReadLine() is not string input)
+                return;
+            if (!input.ToLower().StartsWith("y"))
+                return;
 
-        }
+            if (ContainingList is null)
+            {
+                Console.WriteLine("Remove: Must finalize, unkown list");
+                return;
+            }
 
-        public static void Remove(RemoveOptions option)
-        {
-
+            ContainingList.Remove(SelectedObject);
         }
         #endregion
 
