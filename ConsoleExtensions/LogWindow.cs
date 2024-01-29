@@ -38,7 +38,6 @@ namespace ConsoleExtensions
             }
         }
 
-
         public LogWindow()
         {
             Main.Deinitialized += (sender, e) => { Close(); };

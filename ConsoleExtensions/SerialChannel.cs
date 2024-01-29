@@ -35,6 +35,8 @@ namespace ConsoleExtensions
         public SerialChannel(string portName, int buadrate)
             : this()
         {
+            Port.PortName = portName;
+            Port.BaudRate = buadrate;
         }
 
         public object? Open()
@@ -69,7 +71,7 @@ namespace ConsoleExtensions
                 Port.Close();
         }
 
-        private static List<string> s_oldPortNames = new();
+        private static readonly List<string> s_oldPortNames = new();
 
         [IChannel.Detector]
         public static IChannel[] Detect()
