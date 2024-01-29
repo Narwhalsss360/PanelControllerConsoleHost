@@ -13,6 +13,7 @@ namespace ConsoleExtensions
 
         public NamedPipe()
         {
+            throw new NotImplementedException("Incomplete");
         }
 
         public void Close()

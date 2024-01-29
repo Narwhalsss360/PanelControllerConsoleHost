@@ -10,7 +10,7 @@ namespace ConsoleExtensions
     {
         public TextBox LogBox = new()
         {
-            FontSize = 14,
+            FontSize = 16,
             FontWeight = FontWeights.Bold,
             Margin = new Thickness(10),
             IsReadOnly = true,
