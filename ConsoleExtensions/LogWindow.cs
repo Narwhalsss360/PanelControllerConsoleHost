@@ -20,7 +20,7 @@ namespace ConsoleExtensions
             VerticalScrollBarVisibility = ScrollBarVisibility.Visible,
         };
 
-        private string _logFormat = "/T [/L][/F] /M";
+        private string _logFormat = "/T [/L][/F] /M\n";
 
         [UserProperty]
         public string LogFormat
