@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Windows.Threading;
 using System.Xml;
 using System.Xml.Serialization;
+using Windows.System.Profile;
 using CtrlMain = PanelController.Controller.Main;
 
 namespace ConsoleHost
@@ -153,8 +154,17 @@ namespace ConsoleHost
         {
             MainDispatcher.Invoke(() =>
             {
-                SaveProfiles();
-                SavePanels();
+                try
+                {
+                    SaveProfiles();
+                    SavePanels();
+                }
+                catch (InvalidOperationException e)
+                {
+                    if (!e.Message.Contains("Collection was modified; enumeration operation may not execute"))
+                        throw;
+                    return;
+                }
             });
         }
 
