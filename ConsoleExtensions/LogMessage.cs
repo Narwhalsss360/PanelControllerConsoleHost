@@ -28,7 +28,7 @@ namespace ConsoleExtensions
 
         public LogMessage(string message, string sender, Logger.Levels level)
         {
-            Message = message;
+            Message = $"{message}\n";
             Sender = sender;
             Level = level;
         }
