@@ -52,6 +52,7 @@ namespace ConsoleHost
 
             if (paramters.Length != 0)
             {
+                Console.WriteLine(paramters.GetParametersDescription());
                 Console.Write("Enter arguments:");
                 string[]? entries;
                 try
@@ -75,9 +76,16 @@ namespace ConsoleHost
             {
                 @object = Activator.CreateInstance(type, arguments) as IPanelObject;
             }
-            catch (Exception e)
+            catch (Exception? e)
             {
                 Console.WriteLine($"An error occured trying to create {type.GetItemName()}, {e.Message}");
+                e = e.InnerException;
+
+                while (e is not null)
+                {
+                    Console.WriteLine($"Inner: {e}");
+                    e = e.InnerException;
+                }
                 return null;
             }
             return @object;
@@ -479,18 +487,37 @@ namespace ConsoleHost
         #endregion
 
         #region Create
-        public static void CreateGeneric(string fullName)
+        public static void CreateGeneric(string fullName, bool dispatched = false)
         {
             if (fullName.FindType(Extensions.ExtensionCategories.Generic) is not Type type)
             {
-                Console.WriteLine($"Extension {fullName}");
+                Console.WriteLine($"Extension {fullName} is not Generic/Found");
                 return;
             }
 
-            if (CreateDispatchedInstance(type) is not IPanelObject @object)
+            IPanelObject? created = dispatched ? CreateDispatchedInstance(type) : CreateInstance(type);
+            if (created is not IPanelObject @object)
                 return;
 
             Extensions.Objects.Add(@object);
+        }
+
+        public static void CreateChannel(string fullName, bool dispatched = false)
+        {
+            if (fullName.FindType(Extensions.ExtensionCategories.Channel) is not Type type)
+            {
+                Console.WriteLine($"Type {fullName} not found");
+                return;
+            }
+
+            IPanelObject? created = dispatched ? CreateDispatchedInstance(type) : CreateInstance(type);
+            if (created is not IChannel channel)
+            {
+                Console.WriteLine("Instance was not IChannel");
+                return;
+            }
+
+            _ = Main.HandshakeAsync(channel);
         }
 
         public static void CreateProfile(string name, bool set = false)
@@ -549,7 +576,7 @@ namespace ConsoleHost
             Main.CurrentProfile.AddMapping(newMapping);
         }
 
-        public static void CreateMappedObject(string panelName)
+        public static void CreateMappedObject(string panelName, bool dispatched = false)
         {
             if (SelectedObject is not Mapping mapping)
             {
@@ -590,7 +617,8 @@ namespace ConsoleHost
                 return;
             }
 
-            if (CreateInstance(type) is not IPanelObject @object)
+            IPanelObject? created = dispatched ? CreateDispatchedInstance(type) : CreateInstance(type);
+            if (created is not IPanelObject @object)
                 return;
 
             mapping.Objects.Add(new(@object, TimeSpan.Zero, null));
@@ -610,6 +638,7 @@ namespace ConsoleHost
         public enum CreateOptions
         {
             Generic,
+            Channel,
             Profile,
             Mapping,
             MappedObject,
@@ -618,19 +647,23 @@ namespace ConsoleHost
 
         public static void Create(CreateOptions option, string name, string[]? flags = null)
         {
+            flags ??= Array.Empty<string>();
             switch (option)
             {
                 case CreateOptions.Generic:
-                    CreateGeneric(name);
+                    CreateGeneric(name, flags.Contains("--dispatched"));
+                    break;
+                case CreateOptions.Channel:
+                    CreateChannel(name, flags.Contains("--dispatched"));
                     break;
                 case CreateOptions.Profile:
-                    CreateProfile(name, flags is not null && flags.Contains("--select"));
+                    CreateProfile(name, flags.Contains("--select"));
                     break;
                 case CreateOptions.Mapping:
                     CreateMapping(name);
                     break;
                 case CreateOptions.MappedObject:
-                    CreateMappedObject(name);
+                    CreateMappedObject(name, flags.Contains("--dispatched"));
                     break;
                 case CreateOptions.PanelInfo:
                     CreatePanelInfo(name);
