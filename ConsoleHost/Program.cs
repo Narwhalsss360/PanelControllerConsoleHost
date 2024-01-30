@@ -29,6 +29,8 @@ namespace ConsoleHost
 
         public static readonly string PanelsInfoDirectory = Path.Combine(CWD, PanelsInfoFolder);
 
+        public static readonly XmlWriterSettings MainXmlWriterSettings = new () { Indent = true, Encoding = System.Text.Encoding.UTF32, IndentChars = "    " };
+
         public static Dispatcher MainDispatcher = Dispatcher.CurrentDispatcher;
 
         public static void LoadExtensions()
@@ -113,8 +115,8 @@ namespace ConsoleHost
             XmlSerializer serializer = new(typeof(Profile.SerializableProfile));
             foreach (Profile profile in CtrlMain.Profiles)
             {
-                using FileStream file = File.Open($"{profile.Name}.xml", FileMode.Create);
-                using XmlWriter writer = XmlWriter.Create(file);
+                using FileStream file = File.Open(Path.Combine(ProfilesDirectory, $"{profile.Name}.xml"), FileMode.Create);
+                using XmlWriter writer = XmlWriter.Create(file, MainXmlWriterSettings);
                 serializer.Serialize(writer, new Profile.SerializableProfile(profile));
             }
 
@@ -134,12 +136,12 @@ namespace ConsoleHost
             XmlSerializer serializer = new(typeof(PanelInfo));
             foreach (PanelInfo panelInfo in CtrlMain.PanelsInfo)
             {
-                using FileStream file = File.Open($"{panelInfo.PanelGuid}.xml", FileMode.Create);
-                using XmlWriter writer = XmlWriter.Create(file);
+                using FileStream file = File.Open(Path.Combine(PanelsInfoDirectory, $"{panelInfo.PanelGuid}.xml"), FileMode.Create);
+                using XmlWriter writer = XmlWriter.Create(file, MainXmlWriterSettings);
                 serializer.Serialize(writer, panelInfo);
             }
 
-            foreach (FileInfo file in new DirectoryInfo(ProfilesDirectory).GetFiles())
+            foreach (FileInfo file in new DirectoryInfo(PanelsInfoDirectory).GetFiles())
             {
                 if (CtrlMain.PanelsInfo.Any(panelInfo => $"{panelInfo.PanelGuid}.xml" == file.Name))
                     continue;
@@ -149,8 +151,11 @@ namespace ConsoleHost
 
         public static void SaveAll(object? sender = null, EventArgs? args = null)
         {
-            SaveProfiles();
-            SavePanels();
+            MainDispatcher.Invoke(() =>
+            {
+                SaveProfiles();
+                SavePanels();
+            });
         }
 
         [STAThread]
@@ -167,6 +172,8 @@ namespace ConsoleHost
             LoadAll();
             SaveTimer.Start();
             InterpreterThread.Start();
+            if (CtrlMain.Profiles.Count > 0)
+                CtrlMain.SelectedProfileIndex = 0;
             Dispatcher.Run();
         }
 
@@ -182,6 +189,7 @@ namespace ConsoleHost
         public static void Quit()
         {
             Console.WriteLine("Exiting...");
+            SaveAll();
             CtrlMain.Deinitialize();
         }
     }

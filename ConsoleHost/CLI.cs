@@ -10,7 +10,7 @@ namespace ConsoleHost
 {
     public static class CLI
     {
-        public static CLIInterpreter Interpreter = new(Show, Create, Select, Deselect, Edit, Remove, LogDump, Clear, Quit)
+        public static CLIInterpreter Interpreter = new(Show, Create, Select, Deselect, Edit, Remove, LogDump, Clear, Program.SaveAll, Quit)
         {
             InterfaceName = "PanelController",
             EntryMarker = ">"
@@ -52,7 +52,22 @@ namespace ConsoleHost
 
             if (paramters.Length != 0)
             {
+                Console.Write("Enter arguments:");
+                string[]? entries;
+                try
+                {
+                    entries = Console.ReadLine()?.DeliminateOutside().ToArray();
+                }
+                catch (ArgumentException e)
+                {
+                    Console.WriteLine(e);
+                    return null;
+                }
 
+                if (entries is null)
+                    return null;
+
+                arguments = paramters.ParseArguments(entries);
             }
 
             IPanelObject? @object;
@@ -74,79 +89,53 @@ namespace ConsoleHost
             Program.MainDispatcher.Invoke(() => { instance = CreateInstance(type); });
             return instance;
         }
+
+        public static T? List<T>(this IList<T> enumerable) where T : class
+        {
+            int index = -1;
+
+            if (enumerable.Count == 0)
+                return null;
+
+            Console.WriteLine("Select index:");
+            for (int i = 0; i < enumerable.Count; i++)
+                Console.WriteLine($"{i} {enumerable[i]}");
+
+            if (!int.TryParse(Console.ReadLine(), out index))
+                Console.WriteLine("Not a number");
+
+            return index == -1 ? null : enumerable[index];
+        }
+
+        public static T? MatchOrList<T>(this IList<T> enumerable, Predicate<T>? predicate = null) where T : class
+        {
+            if (predicate is null)
+                return enumerable.List();
+
+            for (int i = 0; i < enumerable.Count; i++)
+            {
+                if (predicate(enumerable[i]))
+                    return enumerable[i];
+            }
+            return enumerable.List();
+        }
         #endregion
 
         #region Select
+
+        /*
+         * Valid Selectable Types:
+         * - Generic: From Extensions.Objects[[]
+         * - PanelInfo: From Main.PanelsInfo[]
+         * - Profile: From Main.Profiles[]
+         * - Mapping: From CurrentProfile.Mappings[]
+         * - MappedObject: From Mapping.Objects, Mapping must be preselected
+         * - IPanelObject: From MappedObject.Object, Mapping must be preselected and InnerObject argument given
+         */
+
         public static object? ContainingObject = null;
         public static IList? ContainingList = null;
         public static object? SelectedObject = null;
-
-        public static void SelectProfile(string? name = null)
-        {
-            if (name is null)
-            {
-                Console.WriteLine("Select index:");
-                for (int i = 0; i < Main.Profiles.Count; i++)
-                    Console.WriteLine($"{i} {Main.Profiles[i].Name}");
-
-                if (!int.TryParse(Console.ReadLine(), out int index))
-                {
-                    Console.WriteLine("Not a number");
-                    return;
-                }
-                Main.SelectedProfileIndex = index;
-                ContainingObject = null;
-                ContainingList = Main.Profiles;
-                SelectedObject = Main.CurrentProfile;
-            }
-            else
-            {
-                for (int i = 0; i < Main.Profiles.Count; i++)
-                {
-                    if (Main.Profiles[i].Name == name)
-                    {
-                        Main.SelectedProfileIndex = i;
-                        ContainingObject = null;
-                        ContainingList = Main.Profiles;
-                        SelectedObject = Main.CurrentProfile;
-                        return;
-                    }
-                }
-                Console.WriteLine($"Profile {name} not found");
-                SelectProfile(null);
-            }
-        }
-
-        public static void SelectPanel(string? panelName = null)
-        {
-            if (panelName is null)
-            {
-                Console.WriteLine("Select index:");
-                for (int i = 0; i < Main.PanelsInfo.Count; i++)
-                    Console.WriteLine($"{i} {Main.PanelsInfo[i].Name} | {Main.PanelsInfo[i].PanelGuid}");
-
-                if (!int.TryParse(Console.ReadLine(), out int index))
-                {
-                    Console.WriteLine("Not a number");
-                    return;
-                }
-                ContainingObject = null;
-                ContainingList = Main.PanelsInfo;
-                SelectedObject = Main.PanelsInfo[index];
-            }
-            else
-            {
-                if (Main.PanelsInfo.Find(info => info.Name == panelName) is PanelInfo panelInfo)
-                {
-                    ContainingObject = null;
-                    ContainingList = Main.PanelsInfo;
-                    SelectedObject = panelInfo;
-                    return;
-                }
-                Console.WriteLine($"Panel with name {panelName} was not found");
-                SelectPanel(null);
-            }
-        }
 
         public static void SelectGeneric()
         {
@@ -171,14 +160,129 @@ namespace ConsoleHost
             SelectedObject = Extensions.Objects[index];
         }
 
-        public enum SelectOptions
+        public static void SelectPanel(string? panelName = null)
         {
-            Profile,
-            Panel,
-            Generic
+            if (panelName is null)
+            {
+                Console.WriteLine("Select index:");
+                for (int i = 0; i < Main.PanelsInfo.Count; i++)
+                    Console.WriteLine($"{i} {Main.PanelsInfo[i]}");
+
+                if (!int.TryParse(Console.ReadLine(), out int index))
+                {
+                    Console.WriteLine("Not a number");
+                    return;
+                }
+                ContainingObject = null;
+                ContainingList = Main.PanelsInfo;
+                SelectedObject = Main.PanelsInfo[index];
+            }
+            else
+            {
+                if (Main.PanelsInfo.Find(info => info.Name == panelName) is PanelInfo panelInfo)
+                {
+                    ContainingObject = null;
+                    ContainingList = Main.PanelsInfo;
+                    SelectedObject = panelInfo;
+                    return;
+                }
+                Console.WriteLine($"Panel with profileName {panelName} was not found");
+                SelectPanel(null);
+            }
         }
 
-        public static void Select(SelectOptions? option = null, string? name = null)
+        public static void SelectProfile(string? profileName = null)
+        {
+            if (profileName is null)
+            {
+                Console.WriteLine("Select index:");
+                for (int i = 0; i < Main.Profiles.Count; i++)
+                    Console.WriteLine($"{i} {Main.Profiles[i]}");
+
+                if (!int.TryParse(Console.ReadLine(), out int index))
+                {
+                    Console.WriteLine("Not a number");
+                    return;
+                }
+                Main.SelectedProfileIndex = index;
+                ContainingObject = null;
+                ContainingList = Main.Profiles;
+                SelectedObject = Main.CurrentProfile;
+            }
+            else
+            {
+                for (int i = 0; i < Main.Profiles.Count; i++)
+                {
+                    if (Main.Profiles[i].Name == profileName)
+                    {
+                        Main.SelectedProfileIndex = i;
+                        ContainingObject = null;
+                        ContainingList = Main.Profiles;
+                        SelectedObject = Main.CurrentProfile;
+                        return;
+                    }
+                }
+                Console.WriteLine($"Profile {profileName} not found");
+                SelectProfile(null);
+            }
+        }
+        
+        public static void SelectMapping(string? mappingName = null)
+        {
+            if (Main.CurrentProfile is null)
+            {
+                Console.WriteLine("No currently selected profile");
+                return;
+            }
+
+            if (Main.CurrentProfile.Mappings.MatchOrList(mapping => mapping.Name == mappingName) is not Mapping mapping)
+                return;
+
+            ContainingObject = Main.CurrentProfile;
+            ContainingList = Main.CurrentProfile.MappingsByGuid[mapping.PanelGuid];
+            SelectedObject = mapping;
+        }
+
+        public static void SelectMappedObject(bool? inner = null)
+        {
+            inner ??= false;
+
+            if (SelectedObject is not Mapping mapping)
+            {
+                Console.WriteLine("Selected type is not of mapping");
+                return;
+            }
+
+            if (mapping.Objects.List() is not Mapping.MappedObject mapped)
+            {
+                Console.WriteLine("MappedObject not selected");
+                return;
+            }
+
+            if (inner.HasValue && inner.Value)
+            {
+                ContainingObject = mapped;
+                ContainingList = null;
+                SelectedObject = mapped.Object;
+            }
+            else
+            {
+                ContainingObject = mapping;
+                ContainingList = mapping.Objects;
+                SelectedObject = mapped;
+            }
+        }
+
+        public enum SelectOptions
+        {
+            Generic,
+            Panel,
+            Profile,
+            Mapping,
+            MappedObject
+        }
+
+        public static void Select(SelectOptions? option = null, string? value = null)
         {
             if (option is null)
             {
@@ -191,14 +295,20 @@ namespace ConsoleHost
             }
             switch (option)
             {
-                case SelectOptions.Profile:
-                    SelectProfile(name);
-                    break;
-                case SelectOptions.Panel:
-                    SelectPanel(name);
-                    break;
                 case SelectOptions.Generic:
                     SelectGeneric();
+                    break;
+                case SelectOptions.Panel:
+                    SelectPanel(value);
+                    break;
+                case SelectOptions.Profile:
+                    SelectProfile(value);
+                    break;
+                case SelectOptions.Mapping:
+                    SelectMapping(value);
+                    break;
+                case SelectOptions.MappedObject:
+                    SelectMappedObject(value == "InnerObject");
                     break;
                 default:
                     break;
@@ -229,7 +339,7 @@ namespace ConsoleHost
                 return;
             Console.WriteLine("Profiles:");
             foreach (Profile profile in Main.Profiles)
-                Console.WriteLine($"    {profile.Name} {(ReferenceEquals(Main.CurrentProfile, profile) ? "SELECTED" : "")}");
+                Console.WriteLine($"    {profile} {(ReferenceEquals(Main.CurrentProfile, profile) ? "SELECTED" : "")}");
         }
 
         public static void ShowMappings()
@@ -242,7 +352,7 @@ namespace ConsoleHost
             Console.WriteLine("Mappings: ");
             foreach (Mapping mapping in Main.CurrentProfile.Mappings)
             {
-                Console.WriteLine($"    {mapping.PanelGuid.PanelInfoNameOrGuid()} {mapping.InterfaceType} ID:{mapping.InterfaceID} OPTION:{mapping.InterfaceOption}");
+                Console.WriteLine($"    {mapping}");
                 foreach (Mapping.MappedObject mapped in mapping.Objects)
                     Console.WriteLine($"        {mapped.Object}:{mapped.Object.Status} {mapped.Delay} {mapped.Value}");
             }
@@ -250,6 +360,9 @@ namespace ConsoleHost
 
         public static void ShowPanels()
         {
+            if (Main.PanelsInfo.Count == 0)
+                return;
+
             Console.WriteLine("Panels:");
             foreach (PanelInfo info in Main.PanelsInfo)
             {
@@ -262,9 +375,51 @@ namespace ConsoleHost
 
         public static void ShowProperties()
         {
+            if (SelectedObject is null)
+            {
+                Console.WriteLine("No");
+                return;
+            }
+
+            Type[] knownTypes = new Type[]
+            {
+                typeof(Profile),
+                typeof(PanelInfo),
+                typeof(Mapping)
+            };
+
             if (SelectedObject is not IPanelObject @object)
             {
-                Console.WriteLine("Property listing is only supported on types of IPanelObject");
+                if (!knownTypes.Contains(SelectedObject.GetType()))
+                    Console.WriteLine($"WARNING: Listing of non-IPanelObject, listing {SelectedObject.GetType().Name} {SelectedObject}");
+
+                Console.WriteLine("Properties:");
+                foreach (PropertyInfo property in SelectedObject.GetType().GetProperties())
+                {
+                    Console.Write($"    {(property.IsUserProperty() ? "*" : "")}{property.PropertyType.Name} {property.Name} = ");
+                    try
+                    {
+                        Console.WriteLine(property.GetValue(SelectedObject)?.ToString());
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"Exception thrown trying to read: {e}");
+                    }
+                }
+
+                Console.WriteLine("Fields:");
+                foreach (FieldInfo field in SelectedObject.GetType().GetFields())
+                {
+                    Console.Write($"    {field.FieldType.Name} {field.Name} = ");
+                    try
+                    {
+                        Console.WriteLine(field.GetValue(SelectedObject)?.ToString());
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"Exception thrown trying to read: {e}");
+                    }
+                }
                 return;
             }
 
@@ -293,6 +448,7 @@ namespace ConsoleHost
             switch (option)
             {
                 case ShowOptions.All:
+                    Select(null);
                     ShowLoadedExtensions();
                     ShowProfiles();
                     ShowMappings();
@@ -344,7 +500,7 @@ namespace ConsoleHost
                 Main.SelectedProfileIndex = Main.Profiles.Count - 1;
         }
 
-        public static void CreateMapping(string panelName)
+        public static void CreateMapping(string name)
         {
             if (Main.CurrentProfile is null)
             {
@@ -352,13 +508,7 @@ namespace ConsoleHost
                 return;
             }
 
-            if (Main.PanelsInfo.Find(info => info.Name == panelName) is not PanelInfo info)
-            {
-                Console.WriteLine($"Did not find panel with name {panelName}");
-                return;
-            }
-
-            Console.WriteLine("Enter interfaceType, interfaceID, onActivate(Digital Only)");
+            Console.WriteLine("Enter interfaceType, interfaceID, panelName (enter '_' to select from list), onActivate(Digital Only)");
             if (Console.ReadLine() is not string entry)
                 return;
 
@@ -366,36 +516,44 @@ namespace ConsoleHost
             {
                 typeof(InterfaceTypes),
                 typeof(uint),
+                typeof(string),
                 typeof(bool?)
-            }.ParseArguments(entry.DeliminateOutside().ToArray(), new() { { 2, null } });
+            }.ParseArguments(entry.DeliminateOutside().ToArray(), new()
+            {
+                { 2, null },
+                { 3, null }
+            });
 
-            bool? onActivate = arguments[2] as bool?;
-            if (arguments[0] is not InterfaceTypes interfaceType || arguments[1] is not uint interfaceID)
+            if (arguments[0] is not InterfaceTypes interfaceType ||
+                arguments[1] is not uint interfaceID)
             {
                 Console.WriteLine("Invalid arguments entered");
                 return;
             }
+            bool? onActivate = arguments[3] as bool?;
 
-            if (Main.CurrentProfile.FindMapping(info.PanelGuid, interfaceType, interfaceID, onActivate) is not null)
+            if (Main.PanelsInfo.MatchOrList(info => info.Name == arguments[2] as string ) is not PanelInfo info)
+            {
+                Console.WriteLine("PanelInfo not found");
+                return;
+            }
+
+            Mapping newMapping = new() { Name = name, PanelGuid = info.PanelGuid, InterfaceType = interfaceType, InterfaceID = interfaceID, InterfaceOption = onActivate };
+
+            if (Main.CurrentProfile.FindMapping(newMapping) is not null)
             {
                 Console.WriteLine("Mapping already exists");
                 return;
             }
 
-            Main.CurrentProfile.AddMapping(new()
-            {
-                PanelGuid = info.PanelGuid,
-                InterfaceType = interfaceType,
-                InterfaceID = interfaceID,
-                InterfaceOption = onActivate
-            });
+            Main.CurrentProfile.AddMapping(newMapping);
         }
 
         public static void CreateMappedObject(string panelName)
         {
-            if (Main.CurrentProfile is null)
+            if (SelectedObject is not Mapping mapping)
             {
-                Console.WriteLine("No current selected profile");
+                Console.WriteLine("Selected object must be of tpe Mapping");
                 return;
             }
 
@@ -425,35 +583,8 @@ namespace ConsoleHost
                 info = Main.PanelsInfo[index];
             }
 
-            Console.WriteLine("Enter panelName/Guid, interfaceType, interfaceID, objectName, onActivate(Digital Only)");
-            if (Console.ReadLine() is not string entry)
-                return;
-
-            object?[] arguments = new Type[]
-            {
-                typeof(string),
-                typeof(InterfaceTypes),
-                typeof(uint),
-                typeof(string),
-                typeof(bool?)
-            }.ParseArguments(entry.DeliminateOutside().ToArray(), new() { { 4, null } });
-
-            bool? onActivate = arguments[3] as bool?;
-            if (arguments[0] is not InterfaceTypes interfaceType ||
-                arguments[1] is not uint interfaceID ||
-                arguments[2] is not string typeName)
-            {
-                Console.WriteLine("Invalid arguments entered");
-                return;
-            }
-
-            if (Main.CurrentProfile.FindMapping(info.PanelGuid, interfaceType, interfaceID, onActivate) is not Mapping mapping)
-            {
-                Console.WriteLine("Mapping doesnt exist");
-                return;
-            }
-
-            if (typeName.FindType() is not Type type)
+            Console.Write("Enter type name:");
+            if (Console.ReadLine().FindType() is not Type type)
             {
                 Console.WriteLine("Type not found");
                 return;
@@ -469,7 +600,7 @@ namespace ConsoleHost
         {
             if (Main.PanelsInfo.Find(info => info.Name == panelName) is not null)
             {
-                Console.WriteLine("Panel with name already exsits");
+                Console.WriteLine("Panel with profileName already exsits");
                 return;
             }
 
@@ -529,7 +660,7 @@ namespace ConsoleHost
             else if (SelectedObject is IPanelObject panelObject)
                 panelObject.TrySetItemName(name);
             else
-                Console.WriteLine("Cannot edit name of selected object");
+                Console.WriteLine("Cannot edit value of selected object");
         }
 
         public static void EditPanelInfo(string valueEntry)
@@ -631,7 +762,7 @@ namespace ConsoleHost
 
             if (ContainingList is null)
             {
-                Console.WriteLine("Remove: Must finalize, unkown list");
+                Console.WriteLine("Remove: unkown list");
                 return;
             }
 
