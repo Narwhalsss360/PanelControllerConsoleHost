@@ -254,6 +254,15 @@ namespace ConsoleHost
         public static void SelectMappedObject(bool? inner = null)
         {
             inner ??= false;
+            if (SelectedObject is Mapping.MappedObject mappedObject)
+            {
+                if (!inner.Value)
+                    return;
+                ContainingObject = mappedObject;
+                ContainingList = null;
+                SelectedObject = mappedObject.Object;
+                return;
+            }
 
             if (SelectedObject is not Mapping mapping)
             {
@@ -267,7 +276,7 @@ namespace ConsoleHost
                 return;
             }
 
-            if (inner.HasValue && inner.Value)
+            if (inner.Value)
             {
                 ContainingObject = mapped;
                 ContainingList = null;
@@ -301,6 +310,7 @@ namespace ConsoleHost
                 Console.WriteLine($"Current Profile: {Main.CurrentProfile?.Name}");
                 return;
             }
+
             switch (option)
             {
                 case SelectOptions.Generic:
