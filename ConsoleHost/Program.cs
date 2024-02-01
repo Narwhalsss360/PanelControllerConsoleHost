@@ -30,7 +30,7 @@ namespace ConsoleHost
 
         public static readonly string PanelsInfoDirectory = Path.Combine(CWD, PanelsInfoFolder);
 
-        public static readonly XmlWriterSettings MainXmlWriterSettings = new () { Indent = true, Encoding = System.Text.Encoding.UTF32, IndentChars = "    " };
+        public static readonly XmlWriterSettings MainXmlWriterSettings = new () { Indent = true, Encoding = System.Text.Encoding.UTF8, IndentChars = "    " };
 
         public static Dispatcher MainDispatcher = Dispatcher.CurrentDispatcher;
 
@@ -69,8 +69,16 @@ namespace ConsoleHost
 
                 using FileStream stream = file.OpenRead();
                 using XmlReader reader = XmlReader.Create(stream);
-                if (!serializer.CanDeserialize(reader))
+                try
+                {
+                    if (!serializer.CanDeserialize(reader))
                     continue;
+                }
+                catch (XmlException)
+                {
+                    continue;
+                }
+
                 if (serializer.Deserialize(reader) is not Profile.SerializableProfile serializable)
                     continue;
 
@@ -92,8 +100,16 @@ namespace ConsoleHost
                 using FileStream stream = file.OpenRead();
                 using XmlReader reader = XmlReader.Create(stream);
 
-                if (!serializer.CanDeserialize(reader))
+                try
+                {
+                    if (!serializer.CanDeserialize(reader))
+                        continue;
+                }
+                catch (XmlException)
+                {
                     continue;
+                }
+
                 if (serializer.Deserialize(reader) is not PanelInfo panelInfo)
                     continue;
 
