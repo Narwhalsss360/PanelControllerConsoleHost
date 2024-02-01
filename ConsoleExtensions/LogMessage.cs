@@ -16,10 +16,13 @@ namespace ConsoleExtensions
             { "/T", () => { return DateTime.Now.ToString(); } }
         };
 
+        [UserProperty]
         public string Message { get; set; } = string.Empty;
 
+        [UserProperty]
         public string Sender { get; set; } = "";
 
+        [UserProperty]
         public Logger.Levels Level { get; set; } = Logger.Levels.Info;
 
         public LogMessage()
