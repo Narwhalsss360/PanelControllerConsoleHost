@@ -2,7 +2,7 @@
 using PanelController.PanelObjects.Properties;
 using System.IO.Pipes;
 
-namespace ConsoleExtensions
+namespace ConsoleExtensions.Channels
 {
     [ItemName("Named Pipe")]
     public class NamedPipe : IChannel

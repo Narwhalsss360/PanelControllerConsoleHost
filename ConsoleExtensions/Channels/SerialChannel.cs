@@ -3,7 +3,7 @@ using PanelController.PanelObjects.Properties;
 using System.IO.Ports;
 using System.Text;
 
-namespace ConsoleExtensions
+namespace ConsoleExtensions.Channels
 {
     [ItemName("Serial Channel")]
     public class SerialChannel : IChannel
@@ -83,11 +83,18 @@ namespace ConsoleExtensions
 
             string[] currentPortNames = SerialPort.GetPortNames();
 
-            foreach (var old in s_oldPortNames)
+            try
             {
-                if (currentPortNames.Contains(old))
-                    continue;
-                s_oldPortNames.Remove(old);
+                foreach (var old in s_oldPortNames)
+                {
+                    if (currentPortNames.Contains(old))
+                        continue;
+                    s_oldPortNames.Remove(old);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                return Detect();
             }
 
             foreach (var current in currentPortNames)

@@ -2,7 +2,7 @@
 using PanelController.PanelObjects;
 using PanelController.PanelObjects.Properties;
 
-namespace ConsoleExtensions
+namespace ConsoleExtensions.General
 {
     [ItemName("Log Message")]
     [ItemDescription("/T: DateTime")]

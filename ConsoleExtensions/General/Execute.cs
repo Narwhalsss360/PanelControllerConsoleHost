@@ -3,7 +3,7 @@ using PanelController.PanelObjects.Properties;
 using System.Diagnostics;
 using System.IO;
 
-namespace ConsoleExtensions
+namespace ConsoleExtensions.General
 {
     public class Execute : IPanelAction
     {

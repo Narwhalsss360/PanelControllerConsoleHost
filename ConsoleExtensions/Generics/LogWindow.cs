@@ -5,7 +5,7 @@ using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
 
-namespace ConsoleExtensions
+namespace ConsoleExtensions.Generics
 {
     public class LogWindow : Window, IPanelObject
     {
