@@ -49,6 +49,9 @@ namespace ConsoleExtensions
             {
                 return e;
             }
+
+            //Delay for devices that reset after serial port opens (arduino replicas).
+            Task.Delay(3000).Wait();
             return null;
         }
 
