@@ -5,12 +5,13 @@ using PanelController.PanelObjects.Properties;
 using PanelController.Profiling;
 using System.Collections;
 using System.Reflection;
+using System.Windows.Threading;
 
 namespace ConsoleHost
 {
     public static class CLI
     {
-        public static CLIInterpreter Interpreter = new(Show, Create, Select, Deselect, Edit, Remove, LogDump, Clear, Program.SaveAll, Quit)
+        public static CLIInterpreter Interpreter = new(Show, Create, Select, Open, Deselect, Edit, Remove, LogDump, Clear, Program.SaveAll, Quit)
         {
             InterfaceName = "PanelController",
             EntryMarker = ">"
@@ -25,7 +26,7 @@ namespace ConsoleHost
 
             if (constructors.Length == 0)
             {
-                Console.WriteLine($"No constructors exist, {type.GetItemName()} is an invalid extension type");
+                Console.WriteLine($"No constructors exist, {type.GetItemName()} is an invalid extension t");
                 return null;
             }
 
@@ -266,7 +267,7 @@ namespace ConsoleHost
 
             if (SelectedObject is not Mapping mapping)
             {
-                Console.WriteLine("Selected type is not of mapping");
+                Console.WriteLine("Selected t is not of mapping");
                 return;
             }
 
@@ -620,7 +621,7 @@ namespace ConsoleHost
                 info = Main.PanelsInfo[index];
             }
 
-            Console.Write("Enter type name:");
+            Console.Write("Enter t name:");
             if (Console.ReadLine().FindType() is not Type type)
             {
                 Console.WriteLine("Type not found");
@@ -681,6 +682,34 @@ namespace ConsoleHost
                 default:
                     break;
             }
+        }
+        #endregion
+
+        #region Open
+        public static void Open(string typeName, string[]? flags = null)
+        {
+            flags ??= Array.Empty<string>();
+            Type? type = null;
+            foreach (Type t in Extensions.ExtensionsByCategory[Extensions.ExtensionCategories.Generic])
+            {
+                if ((flags.Contains("--full") ? t.FullName : t.Name) == typeName)
+                {
+                    type = t;
+                    break;
+                }
+            }
+
+            if (type is null)
+            {
+                Console.WriteLine($"{typeName} not found");
+                return;
+            }
+
+            IPanelObject? created = CreateDispatchedInstance(type);
+            if (created is not IPanelObject @object)
+                return;
+
+            Extensions.Objects.Add(@object);
         }
         #endregion
 
@@ -762,7 +791,7 @@ namespace ConsoleHost
 
             if (!ParameterInfoExtensions.IsSupported(propertyInfo.PropertyType))
             {
-                Console.WriteLine($"Invalid Extension, type {propertyInfo.PropertyType} is not supported");
+                Console.WriteLine($"Invalid Extension, t {propertyInfo.PropertyType} is not supported");
                 return;
             }
 
