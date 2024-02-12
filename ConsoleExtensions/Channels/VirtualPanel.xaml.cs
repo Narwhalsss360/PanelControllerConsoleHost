@@ -128,7 +128,7 @@ namespace ConsoleExtensions
                     LastLogBox.Text = log.ToString("/T [/L][/F] /M");
                 });
             };
-            Main.PanelsInfo.CollectionChanged += RefreshName;
+            Main.PanelsInfo.CollectionChanged += (sender, e) => Dispatcher.Invoke(() => RefreshName(sender, e));
             PanelNameBox.KeyDown += RefreshName;
             InitializeVirtualInterfaces();
 
