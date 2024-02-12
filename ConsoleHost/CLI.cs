@@ -701,6 +701,19 @@ namespace ConsoleHost
 
             if (type is null)
             {
+
+                foreach (Type t in Extensions.ExtensionsByCategory[Extensions.ExtensionCategories.Channel])
+                {
+                    if ((flags.Contains("--full") ? t.FullName : t.Name) == typeName)
+                    {
+                        type = t;
+                        break;
+                    }
+                }
+            }
+
+            if (type is null)
+            {
                 Console.WriteLine($"{typeName} not found");
                 return;
             }
@@ -709,7 +722,10 @@ namespace ConsoleHost
             if (created is not IPanelObject @object)
                 return;
 
-            Extensions.Objects.Add(@object);
+            if (created is IChannel channel)
+                _ = Main.HandshakeAsync(channel);
+            else
+                Extensions.Objects.Add(@object);
         }
         #endregion
 
