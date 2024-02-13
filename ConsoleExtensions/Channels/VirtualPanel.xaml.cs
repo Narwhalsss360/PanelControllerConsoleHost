@@ -48,11 +48,12 @@ namespace ConsoleExtensions
         {
             this.ID = ID;
             Margin = new Thickness(5);
+            Maximum = 100;
             ValueChanged += (sender, args) =>
             {
                 List<byte> data = new();
                 data.AddRange(BitConverter.GetBytes(ID));
-                data.AddRange(BitConverter.GetBytes((uint)(uint.MaxValue * args.NewValue)));
+                data.AddRange(IPanelSettable.SettableValue.CreateData(decimal.Round((decimal)args.NewValue / 100, 4)));
                 AnalogUpdate?.Invoke(this, new Message((ushort)ConnectedPanel.ReceiveIDs.AnalogStateUpdate, data.ToArray()));
             };
         }
