@@ -20,6 +20,9 @@ namespace ConsoleExtensions.Channels
 
         public event EventHandler<byte[]>? BytesReceived;
 
+        [UserProperty]
+        public int WaitOpenMilliseconds { get; set; } = 50;
+
         public SerialChannel()
         {
             Port.DataReceived += (sender, e) =>
@@ -32,11 +35,12 @@ namespace ConsoleExtensions.Channels
             Port.RtsEnable = true;
         }
 
-        public SerialChannel(string portName, int buadrate)
+        public SerialChannel(string portName, int buadrate, int waitOpenMilliseconds = 100)
             : this()
         {
             Port.PortName = portName;
             Port.BaudRate = buadrate;
+            WaitOpenMilliseconds = waitOpenMilliseconds;
         }
 
         public object? Open()
@@ -51,7 +55,7 @@ namespace ConsoleExtensions.Channels
             }
 
             //Delay for devices that reset after serial port opens (arduino replicas).
-            Task.Delay(4000).Wait();
+            Task.Delay(WaitOpenMilliseconds < 0 ? 0 : WaitOpenMilliseconds).Wait();
             return null;
         }
 
