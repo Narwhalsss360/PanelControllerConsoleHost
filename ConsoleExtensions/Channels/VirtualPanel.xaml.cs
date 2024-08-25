@@ -199,10 +199,10 @@ namespace ConsoleExtensions
             {
                 _collector.Collect(bytes);
             }
-            catch (PacketsLost)
+            catch (PacketsLostException)
             {
             }
-            catch (SizeMismatch)
+            catch (SizeMismatchException)
             {
             }
 
